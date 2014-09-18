@@ -7,6 +7,7 @@ graduated stuffs:
 
 * video player component for QML
 * thread based web server
+* yet another compiler for basic java syntax
 
 
 TODO list
@@ -19,6 +20,7 @@ Backlog
 
 * a simple earch engine for one site (hacker news)
 * a little virtual machine emulator
+* a phoneGap Real application (music streaming app?)
 * command line parser
 * static site generator
 * lisp Interpreter
@@ -27,3 +29,5 @@ Backlog
 * jsfiddle-ish
 * one-line excel editor
 * html5, canvas, deck buiding games
+* bayes application: spellCorrector, spam filter
+* bbs ranking system
