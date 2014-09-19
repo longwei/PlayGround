@@ -2,7 +2,7 @@ __author__ = 'longwei'
 
 import sys
 import re
-from webob import Request
+from webob import Request, Response
 from webob import exc
 
 var_regex = re.compile(r'''
@@ -33,7 +33,6 @@ def load_controller(string):
     module = sys.modules[module_name]
     func = getattr(module, function_name)
     return func
-
 
 class Router(object):
     def __int__(self):
