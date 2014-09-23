@@ -4,6 +4,44 @@ import sys
 import re
 from webob import Request, Response
 from webob import exc
+from wsgiref.simple_server import make_server
+import threading
+import urllib
+
+
+class Localized(object):
+    def __init__(self):
+        self.local = threading.local()
+    def register(self, object):
+        self.local.object = object
+    def unregister(self):
+        del self.local.object
+    def __call__(self):
+        try:
+            return self.local.object
+        except AttributeError:
+            raise TypeError("No object is found for this thread")
+get_request = Localized()
+
+class RegisterRequest(object):
+    def __init__(self, app):
+        self.app = app
+    def __call__(self, environ, start_response):
+        req = Request(environ)
+        get_request.register(req)
+        try:
+            return self.app(environ, start_response)
+        finally:
+            get_request.unregister()
+
+def url(*segments, **vars):
+    base_url = get_request().application_url
+    path = '/'.join(str(s) for s in segments)
+    if not path.startswith('/'):
+         path = '/' + path
+    if vars:
+         path += '?' + urllib.urlencode(vars)
+    return base_url + path
 
 def controller(func):
     def replacement(environ, start_response):
@@ -38,29 +76,6 @@ def rest_controller(cls):
             resp = e
         return resp(environ, start_response)
     return replacement
-
-
-@controller
-def hello(req):
-    if req.method == 'POST':
-        return 'Hello %s!' % req.params['name']
-    elif req.method == 'GET':
-        return '''<form method="POST">
-        You're name: <input type="text" name="name">
-        <input type="submit">
-        </form>'''
-
-
-class Hello(object):
-    def __init__(self,req):
-        self.request = req
-    def get(self):
-        return '''<form method="POST">
-            Hello Class: <input type="text" name="name">
-            <input type="submit">
-            </form>'''
-    def post(self):
-        return 'Hello %s!' % self.request.params['name']
 
 var_regex = re.compile(r'''
 \{          # The exact character "{"
@@ -112,6 +127,27 @@ class Router(object):
         return exc.HTTPNotFound()(environ, start_response)
 
 
+@controller
+def hello(req):
+    if req.method == 'POST':
+        return 'Hello %s!' % req.params['name']
+    elif req.method == 'GET':
+        return '''<form method="POST">
+        You're name: <input type="text" name="name">
+        <input type="submit">
+        </form>'''
+
+
+class Hello(object):
+    def __init__(self,req):
+        self.request = req
+    def get(self):
+        return '''<form method="POST">
+            Hello Class: <input type="text" name="name">
+            <input type="submit">
+            </form>'''
+    def post(self):
+        return 'Hello %s!' % self.request.params['name']
 
 app = Router()
 
@@ -119,13 +155,11 @@ cls = rest_controller(Hello)
 app.add_route('/', controller=hello)
 app.add_route('/cls', controller=cls)
 
-
-
 req = Request.blank('/cls')
+print req
 resp = req.get_response(app)
 print resp
 
-if __name__ == '__main__':
-    from wsgiref.simple_server import make_server
-    server = make_server('127.0.0.1', 8080, app)
-    server.serve_forever()
+
+# server = make_server('127.0.0.1', 8080, app)
+# server.serve_forever()

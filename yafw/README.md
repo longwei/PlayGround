@@ -39,3 +39,7 @@ another way to do is directly give named capturing group syntax:
 after extract parameter from url, the next step is to loading the controller function:
 getattr(module, function_name) will return the function pointer to the controllers
 
+URL generation and request Access
+===================
+because it is bad idea to have direct link inside html.
+relative link are hard to manage and absolute links presume particular location

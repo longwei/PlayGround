@@ -14,6 +14,7 @@ TODO list
 
 * web framework
 * template engine
+* added signal & slot for compiler
 
 
 Backlog
