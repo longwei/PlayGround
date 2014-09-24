@@ -8,19 +8,17 @@ graduated stuffs:
 * video player component for QML
 * thread based web server
 * yet another compiler for basic java syntax
+* web framework
 
 
 TODO list
-
-* web framework
 * template engine
 * added signal & slot for compiler
-
+* a little virtual machine emulator
 
 Backlog
 
 * a simple earch engine for one site (hacker news)
-* a little virtual machine emulator
 * a phoneGap Real application (music streaming app?)
 * command line parser
 * static site generator

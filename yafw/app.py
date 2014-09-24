@@ -161,5 +161,5 @@ resp = req.get_response(app)
 print resp
 
 
-# server = make_server('127.0.0.1', 8080, app)
-# server.serve_forever()
+server = make_server('127.0.0.1', 8080, app)
+server.serve_forever()
