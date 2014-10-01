@@ -61,3 +61,4 @@ output = template.render(data=data)
 
 
 https://docs.djangoproject.com/en/dev/topics/templates/
+http://alexmic.net/building-a-template-engine/

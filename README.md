@@ -3,17 +3,15 @@ PlayGround
 
 prototypes of simple ideas
 
-graduated stuffs:
+done stuffs:
 
 * video player component for QML
 * thread based web server
-* yet another compiler for basic java syntax
-* web framework
-
+* yet another compiler with simple syntax
 
 TODO list
+* tiny web framework http://webpy.org/ http://bottlepy.org/docs/dev/index.html
 * template engine
-* added signal & slot for compiler
 * a little virtual machine emulator
 
 Backlog
