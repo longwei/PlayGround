@@ -18,8 +18,36 @@ see lex or flex as example, basically:
 
 parsing
 ===
-each individual type node will have it own parser. This parser will consume some of the tokens and output a sub-AST and the remaining token stream, recursively apply parser to the tokens stream will result the final AST
+each individual type node will have it own parser(which is a class type). This parser will consume some of the tokens and output a sub-AST and the remaining token stream, recursively apply parser to the tokens stream will result the final AST.
 
-1 + 2
+parser combinator is a higher-order function that accpect sveral parser as input and return a new parser as output
 
-parser = (con(con(INT(1) +) INT(2) ))
+basis parser:
+
+* concat: (left, right)
+* alternative: 	left ? left : right
+* opt: parser ? result : None
+* rep: loop
+* process: if parser? lambda(result.value)
+* lazy, evaluated till applied
+* phrase, take a parser, applied all token
+* Exp
+
+AST basic sturcture:
+
+* arithmetic
+  * integer literal
+  * variables
+  * binary operation
+* boolean expression
+  * relatonal expression
+  * And
+  * Or
+  * Not 
+* statments
+  * assignment
+  * compound
+  * conditional
+  * loop
+ 
+
