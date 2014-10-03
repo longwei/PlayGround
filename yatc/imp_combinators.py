@@ -13,7 +13,7 @@ class Parser:
         return Concat(self, other)
 
     def __mul__(self, other):
-        return Exp(self, other)
+        return Merge(self, other)
 
     def __or__(self, other):
         return Alternate(self, other)
@@ -44,7 +44,9 @@ class Reserved(Parser):
             return Result(tokens[pos][0], pos + 1)
         else:
             return None
-
+#
+#
+#
 class Concat(Parser):
     def __init__(self, left, right):
         self.left = left
@@ -58,8 +60,10 @@ class Concat(Parser):
                 combined_value = (left_result.value, right_result.value)
                 return Result(combined_value, right_result.pos)
         return None
-
-class Exp(Parser):
+# s1;s2;s3
+# s12;s3
+# s123
+class Merge(Parser):
     def __init__(self, parser, separator):
         self.parser = parser
         self.separator = separator
@@ -103,7 +107,7 @@ class Opt(Parser):
         else:
             return Result(None, pos)
 
-class Rep(Parser):
+class Loop(Parser):
     def __init__(self, parser):
         self.parser = parser
 

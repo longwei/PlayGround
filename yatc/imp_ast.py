@@ -1,20 +1,20 @@
 __author__ = 'longwei'
 
 #interface for compare
-class Equality:
+class Comparable:
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
 
     def __ne__(self, other):
         return not __eq__
 
-class Statement(Equality):
+class Statement(Comparable):
     pass
 
-class Aexp(Equality):
+class Aexp(Comparable):
     pass
 
-class Bexp(Equality):
+class Bexp(Comparable):
     pass
 
 class AssignStatement(Statement):
@@ -95,7 +95,7 @@ class VarAexp(Aexp):
         else:
             return 0
 
-class BinopAexp(Aexp):
+class BinaryOpAexp(Aexp):
     def __init__(self, op, left, right):
         self.op = op
         self.left = left
@@ -119,7 +119,7 @@ class BinopAexp(Aexp):
             raise RuntimeError('unknown operator: ' + self.op)
         return value
 
-class RelopBexp(Bexp):
+class RelOpBexp(Bexp):
     def __init__(self, op, left, right):
         self.op = op
         self.left = left

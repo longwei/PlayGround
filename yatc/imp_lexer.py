@@ -34,7 +34,7 @@ ID       = 'ID'
 token_exprs = [
     (r'[ \n\t]+',              None),
     (r'#[^\n]*',               None),
-    (r'\:=',                   RESERVED),
+    (r'\==',                   RESERVED),
     (r'\(',                    RESERVED),
     (r'\)',                    RESERVED),
     (r';',                     RESERVED),
@@ -63,11 +63,3 @@ token_exprs = [
 
 def imp_lex(characters):
     return lex(characters, token_exprs)
-
-
-file = open("input")
-stream = file.read()
-file.close()
-tokens = imp_lex(stream)
-for token in tokens:
-    print token

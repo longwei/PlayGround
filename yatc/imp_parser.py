@@ -1,7 +1,6 @@
-
-from lex import *
-from combinators import *
-from ast import *
+from imp_lexer import *
+from imp_combinators import *
+from imp_ast import *
 
 # Basic parsers
 def keyword(kw):
@@ -16,12 +15,12 @@ def imp_parse(tokens):
     return ast
 
 def parser():
-    return Phrase(stmt_list())    
+    return Phrase(stmt_list())
 
 # Statements
 def stmt_list():
     separator = keyword(';') ^ (lambda x: lambda l, r: CompoundStatement(l, r))
-    return Exp(stmt(), separator)
+    return Merge(stmt(), separator)
 
 def stmt():
     return assign_stmt() | \
@@ -32,7 +31,7 @@ def assign_stmt():
     def process(parsed):
         ((name, _), exp) = parsed
         return AssignStatement(name, exp)
-    return id + keyword(':=') + aexp() ^ process
+    return id + keyword('=') + aexp() ^ process
 
 def if_stmt():
     def process(parsed):
@@ -70,7 +69,7 @@ def bexp_not():
     return keyword('not') + Lazy(bexp_term) ^ (lambda parsed: NotBexp(parsed[1]))
 
 def bexp_relop():
-    relops = ['<', '<=', '>', '>=', '=', '!=']
+    relops = ['<', '<=', '>', '>=', '==', '!=']
     return aexp() + any_operator_in_list(relops) + aexp() ^ process_relop
 
 def bexp_group():
@@ -80,14 +79,14 @@ def bexp_group():
 def aexp():
     return precedence(aexp_term(),
                       aexp_precedence_levels,
-                      process_binop)
+                      process_binOp)
 
 def aexp_term():
     return aexp_value() | aexp_group()
 
 def aexp_group():
     return keyword('(') + Lazy(aexp) + keyword(')') ^ process_group
-           
+
 def aexp_value():
     return (num ^ (lambda i: IntAexp(i))) | \
            (id  ^ (lambda v: VarAexp(v)))
@@ -102,12 +101,12 @@ def precedence(value_parser, precedence_levels, combine):
     return parser
 
 # Miscellaneous functions for binary and relational operators
-def process_binop(op):
-    return lambda l, r: BinopAexp(op, l, r)
+def process_binOp(op):
+    return lambda l, r: BinaryOpAexp(op, l, r)
 
 def process_relop(parsed):
     ((left, op), right) = parsed
-    return RelopBexp(op, left, right)
+    return RelOpBexp(op, left, right)
 
 def process_logic(op):
     if op == 'and':
@@ -136,3 +135,19 @@ bexp_precedence_levels = [
     ['and'],
     ['or'],
 ]
+
+input = """
+n = 5;
+p = 1;
+while n > 0 do
+  p = p * n;
+  n = n - 1
+end
+"""
+
+tokens = imp_lex(input)
+result = imp_parse(tokens)
+ast =  result.value
+env = {}
+ast.eval(env)
+print env
