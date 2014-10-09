@@ -35,7 +35,6 @@ operator_lookup_table = {
 class TemplateError(Exception):
     pass
 
-
 class TemplateContextError(TemplateError):
 
     def __init__(self, context_var):
@@ -43,6 +42,16 @@ class TemplateContextError(TemplateError):
 
     def __str__(self):
         return "cannot resolve '%s'" % self.context_var
+
+class TemplateSyntaxError(TemplateError):
+
+    def __init__(self, fragment):
+        self.fragment_var = fragment
+
+    def __str__(self):
+        return "SyntaxError '%s'" % self.fragment
+
+
 
 def eval_expression(expr):
     try:
@@ -85,7 +94,6 @@ class _Fragment(object):
         else:
             return TEXT_FRAGMENT
 
-
 class _Node(object):
     creates_scope = False
 
@@ -112,6 +120,8 @@ class _Node(object):
             child_html = child.render(context)
             return '' if not child_html else str(child_html)
         return ''.join(map(render_child, children))
+
+
 
 class _ScopableNode(_Node):
     creates_scope = True
@@ -171,14 +181,24 @@ class Compiler(object):
             node_class = _Variable
         elif fragment.type == OPEN_BLOCK_FRAGMENT:
             cmd = fragment.clean.split()[0]
-            if cmd == 'each':
-                node_class = _Each
-            elif cmd == 'if':
-                node_class = _If
-            elif cmd == 'else':
-                node_class = _Else
-            elif cmd == 'call':
-                node_class = _Call
+            # if cmd == 'each':
+            #     node_class = _Each
+            # elif cmd == 'if':
+            #     node_class = _If
+            # elif cmd == 'else':
+            #     node_class = _Else
+            # elif cmd == 'call':
+            #     node_class = _Call
+            node_class = _Node
         if node_class is None:
             raise TemplateSyntaxError(fragment)
         return node_class(fragment.clean)
+
+
+class Template(object):
+    def __init__(self, contents):
+        self.contents = contents
+        self.root = Compiler(contents).compile()
+
+    def render(self, **kwargs):
+        return self.root.render(kwargs)

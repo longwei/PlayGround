@@ -67,7 +67,29 @@ block, type is decide by the first word in the fragment
 each node has its own scope
 
 
+parser:
 
+Node: Text
+    | Var
+    | block
+
+block: ScopeBlock
+     | call
+     | else
+     | end
+
+ScopeBlock: each | if
+
+ScopeStack:
+[root x   ][if scope][each scope][...]
+```
+0
+1  {% if x > 0%}
+1  ...
+2  {% each x.foo%}
+1  {% end %}
+0  {% end %}
+```
 
 REF
 ===
