@@ -13,6 +13,16 @@ class Test(TestCase):
         rendered = Template(input).render(item = 'foo')
         print rendered
 
+    def test_each(self):
+        input = '{% each items %}<div>{{it}}</div>{% end %}'
+        rendered = Template(input).render(items = ['foo', 'bar'])
+        print rendered
+
+    def test_each2(self):
+        input = '{% each [1,2,3] %}<div>{{it}}</div>{% end %}'
+        rendered = Template(input).render(items = ['foo', 'bar'])
+        print rendered
+
     # def test_each(self):
     #     input = "{% each items %} <div>{{ it }}<div> {%end%}"
     #     rendered = Template(input).render(items = ['foo','bar'])

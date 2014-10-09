@@ -9,7 +9,7 @@ OPEN_BLOCK_FRAGMENT = 1 #{%
 CLOSE_BLOCK_FRAGMENT = 2 #%}
 TEXT_FRAGMENT = 3
 
-
+WHITESPACE = re.compile('\s+')
 VAR_TOKEN_START = '{{'
 VAR_TOKEN_END = '}}'
 BLOCK_TOKEN_START = '{%'
@@ -144,6 +144,25 @@ class _Text(_Node):
     def render(self, context):
         return self.text
 
+class _Each(_ScopableNode):
+    def process_fragment(self, fragment):
+        try:
+            # fragment is like "each list_var"
+            _, it = WHITESPACE.split(fragment, 1)
+            self.it = eval_expression(it) #('name' | 'literal', list_var)
+        except ValueError:
+            raise TemplateSyntaxError(fragment)
+
+    def render(self, context):
+        items = self.it[1] if self.it[0] == 'literal' else resolve(self.it[1], context)
+        print items
+        def render_item(item):
+            return self.render_children({'..': context, 'it': item})
+
+        print "***"
+        print self.children
+        return ''.join(map(render_item, items))
+
 
 class Compiler(object):
     def __init__(self, template_string):
@@ -181,15 +200,14 @@ class Compiler(object):
             node_class = _Variable
         elif fragment.type == OPEN_BLOCK_FRAGMENT:
             cmd = fragment.clean.split()[0]
-            # if cmd == 'each':
-            #     node_class = _Each
+            if cmd == 'each':
+                node_class = _Each
             # elif cmd == 'if':
             #     node_class = _If
             # elif cmd == 'else':
             #     node_class = _Else
             # elif cmd == 'call':
             #     node_class = _Call
-            node_class = _Node
         if node_class is None:
             raise TemplateSyntaxError(fragment)
         return node_class(fragment.clean)
