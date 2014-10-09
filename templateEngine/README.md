@@ -57,8 +57,19 @@ output = template.render(data=data)
   ```
 
 
+implementation
+===
+the first step will be make a AST!
+
+text and variables fragments => directly translate
+block, type is decide by the first word in the fragment
+
+each node has its own scope
 
 
 
+
+REF
+===
 https://docs.djangoproject.com/en/dev/topics/templates/
 http://alexmic.net/building-a-template-engine/
