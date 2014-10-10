@@ -155,14 +155,59 @@ class _Each(_ScopableNode):
 
     def render(self, context):
         items = self.it[1] if self.it[0] == 'literal' else resolve(self.it[1], context)
-        print items
         def render_item(item):
             return self.render_children({'..': context, 'it': item})
-
-        print "***"
-        print self.children
         return ''.join(map(render_item, items))
 
+class _If(_ScopableNode):
+    def process_fragment(self, fragment):
+        # foo > bar or BooleanValue
+        compareBool = fragment.split()[1:]
+        if len(compareBool) not in (1, 3):
+            raise TemplateSyntaxError(fragment)
+        self.lhs = eval_expression(compareBool[0])
+        print "cc"
+        print self.lhs
+        if len(compareBool) == 3:
+            self.op = compareBool[1]
+            self.rhs = eval_expression(compareBool[2])
+
+    def render(self, context):
+        lhs = self.resolve_side(self.lhs, context)
+        if hasattr(self, 'op'):
+            op = operator_lookup_table.get(self.op)
+            if op is None:
+                raise TemplateSyntaxError(self.op)
+            rhs = self.resolve_side(self.rhs, context)
+            exec_if_branch = op(lhs, rhs)
+        else:
+            exec_if_branch = operator.truth(lhs)
+        if_branch, else_branch = self.split_children()
+        return self.render_children(context,
+            self.if_branch if exec_if_branch else self.else_branch)
+
+    def resolve_side(self, side, context):
+        return side[1] if side[0] == 'literal' else resolve(side[1], context)
+
+    def exit_scope(self):
+        self.if_branch, self.else_branch = self.split_children()
+        print self.if_branch[0].text
+        print self.else_branch
+
+
+    def split_children(self):
+        if_branch, else_branch = [], []
+        curr = if_branch
+        for child in self.children:
+            if isinstance(child, _Else):
+                curr = else_branch
+                continue
+            curr.append(child)
+        return if_branch, else_branch
+
+class _Else(_Node):
+    def render(self, context):
+        pass
 
 class Compiler(object):
     def __init__(self, template_string):
@@ -185,7 +230,7 @@ class Compiler(object):
                 scope_stack.pop()
                 continue
             new_node = self.create_node(fragment)
-            if new_node:
+            if new_node:#append every node this this scope until we see a {% end %}
                 parent_scope.children.append(new_node)
                 if new_node.creates_scope:
                     scope_stack.append(new_node)
@@ -202,10 +247,10 @@ class Compiler(object):
             cmd = fragment.clean.split()[0]
             if cmd == 'each':
                 node_class = _Each
-            # elif cmd == 'if':
-            #     node_class = _If
-            # elif cmd == 'else':
-            #     node_class = _Else
+            elif cmd == 'if':
+                node_class = _If
+            elif cmd == 'else':
+                node_class = _Else
             # elif cmd == 'call':
             #     node_class = _Call
         if node_class is None:
