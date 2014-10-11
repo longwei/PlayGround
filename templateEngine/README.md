@@ -79,7 +79,7 @@ block: ScopeBlock
      | end
 
 ScopeBlock: each | if
-
+====
 ScopeStack:
 [root x   ][if scope][each scope][...]
 ```

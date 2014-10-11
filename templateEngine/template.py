@@ -4,24 +4,27 @@ import re
 import operator
 import ast
 
-VAR_FRAGMENT = 0 #{{}}
-OPEN_BLOCK_FRAGMENT = 1 #{%
-CLOSE_BLOCK_FRAGMENT = 2 #%}
-TEXT_FRAGMENT = 3
+
+# def enum(*sequential, **named):
+#     enums = dict(zip(sequential, range(len(sequential))), **named)
+#     return type('Enum', (), enums)
+
+def enum(**enums):
+    return type('Enum', (), enums)
+
+TOKEN_TYPE = enum(VAR_FRAGMENT=0, OPEN_BLOCK_FRAGMENT=1, CLOSE_BLOCK_FRAGMENT=2, TEXT_FRAGMENT=3)
 
 WHITESPACE = re.compile('\s+')
-VAR_TOKEN_START = '{{'
-VAR_TOKEN_END = '}}'
-BLOCK_TOKEN_START = '{%'
-BLOCK_TOKEN_END = '%}'
+VAR_START = '{{'
+VAR_END = '}}'
+BLOCK_START = '{%'
+BLOCK_END = '%}'
 TOK_REGEX = re.compile(r"(%s.*?%s|%s.*?%s)" % (
-    VAR_TOKEN_START,
-    VAR_TOKEN_END,
-    BLOCK_TOKEN_START,
-    BLOCK_TOKEN_END
+    VAR_START,
+    VAR_END,
+    BLOCK_START,
+    BLOCK_END
 ))
-
-
 
 operator_lookup_table = {
     '<': operator.lt,
@@ -80,19 +83,19 @@ class _Fragment(object):
         self.clean = self.clean_fragment()
 
     def clean_fragment(self):
-        if self.raw[:2] in (VAR_TOKEN_START, BLOCK_TOKEN_START):
+        if self.raw[:2] in (VAR_START, BLOCK_START):
             return self.raw.strip()[2:-2].strip()
         return self.raw
 
     @property
     def type(self):
         raw_start = self.raw[:2]
-        if raw_start == VAR_TOKEN_START:
-            return VAR_FRAGMENT
-        elif raw_start == BLOCK_TOKEN_START:#normal open block {% whatever ...%} or close symbol {% end %}
-            return CLOSE_BLOCK_FRAGMENT if self.clean[:3] == 'end' else OPEN_BLOCK_FRAGMENT
+        if raw_start == VAR_START:
+            return TOKEN_TYPE.VAR_FRAGMENT
+        elif raw_start == BLOCK_START:#normal open block {% whatever ...%} or close symbol {% end %}
+            return TOKEN_TYPE.CLOSE_BLOCK_FRAGMENT if self.clean[:3] == 'end' else TOKEN_TYPE.OPEN_BLOCK_FRAGMENT
         else:
-            return TEXT_FRAGMENT
+            return TOKEN_TYPE.TEXT_FRAGMENT
 
 class _Node(object):
     creates_scope = False
@@ -144,6 +147,11 @@ class _Text(_Node):
     def render(self, context):
         return self.text
 
+#      root()
+#        |
+#      each
+#   /   |   \
+#  {{   it   }}
 class _Each(_ScopableNode):
     def process_fragment(self, fragment):
         try:
@@ -159,15 +167,20 @@ class _Each(_ScopableNode):
             return self.render_children({'..': context, 'it': item})
         return ''.join(map(render_item, items))
 
+
+#      parent()
+#        |
+#       ifNode-------------
+#      / | \    \          \
+#    lhs op rhs  if_branch else_branch
 class _If(_ScopableNode):
     def process_fragment(self, fragment):
         # foo > bar or BooleanValue
         compareBool = fragment.split()[1:]
         if len(compareBool) not in (1, 3):
             raise TemplateSyntaxError(fragment)
+        #get the type for left and right side
         self.lhs = eval_expression(compareBool[0])
-        print "cc"
-        print self.lhs
         if len(compareBool) == 3:
             self.op = compareBool[1]
             self.rhs = eval_expression(compareBool[2])
@@ -191,9 +204,6 @@ class _If(_ScopableNode):
 
     def exit_scope(self):
         self.if_branch, self.else_branch = self.split_children()
-        print self.if_branch[0].text
-        print self.else_branch
-
 
     def split_children(self):
         if_branch, else_branch = [], []
@@ -208,6 +218,42 @@ class _If(_ScopableNode):
 class _Else(_Node):
     def render(self, context):
         pass
+
+class _Call(_Node):
+    def process_fragment(self, fragment):
+        try:
+            bits = WHITESPACE.split(fragment)
+            self.callable = bits[1]
+            self.args, self.kwargs = self._parse_params(bits[2:])
+        except ValueError, IndexError:
+            raise TemplateSyntaxError(fragment)
+
+    def _parse_params(self, params):
+        args, kwargs = [], {}
+        for param in params:
+            if '=' in param:
+                name, value = param.split('=')
+                kwargs[name] = eval_expression(value)
+            else:
+                args.append(eval_expression(param))
+        return args, kwargs
+
+    def render(self, context):
+        resolved_args, resolved_kwargs = [], {}
+        for kind, value in self.args:
+            if kind == 'name':
+                value = resolve(value, context)
+            resolved_args.append(value)
+        for key, (kind, value) in self.kwargs.iteritems():
+            if kind == 'name':
+                value = resolve(value, context)
+            resolved_kwargs[key] = value
+        resolved_callable = resolve(self.callable, context)
+        if hasattr(resolved_callable, '__call__'):
+            return resolved_callable(*resolved_args, **resolved_kwargs)
+        else:
+            raise TemplateError("'%s' is not a callable" % self.callable)
+
 
 class Compiler(object):
     def __init__(self, template_string):
@@ -225,12 +271,13 @@ class Compiler(object):
             if not scope_stack:
                 raise TemplateError('nesting issues')
             parent_scope = scope_stack[-1]
-            if fragment.type == CLOSE_BLOCK_FRAGMENT:
+            if fragment.type == TOKEN_TYPE.CLOSE_BLOCK_FRAGMENT:
                 parent_scope.exit_scope()
                 scope_stack.pop()
                 continue
             new_node = self.create_node(fragment)
-            if new_node:#append every node this this scope until we see a {% end %}
+            if new_node:
+                #append every node this this scope until we see a {% end %}
                 parent_scope.children.append(new_node)
                 if new_node.creates_scope:
                     scope_stack.append(new_node)
@@ -239,11 +286,11 @@ class Compiler(object):
 
     def create_node(self, fragment):
         node_class = None
-        if fragment.type == TEXT_FRAGMENT:
+        if fragment.type == TOKEN_TYPE.TEXT_FRAGMENT:
             node_class = _Text
-        elif fragment.type == VAR_FRAGMENT:
+        elif fragment.type == TOKEN_TYPE.VAR_FRAGMENT:
             node_class = _Variable
-        elif fragment.type == OPEN_BLOCK_FRAGMENT:
+        elif fragment.type == TOKEN_TYPE.OPEN_BLOCK_FRAGMENT:
             cmd = fragment.clean.split()[0]
             if cmd == 'each':
                 node_class = _Each
@@ -251,8 +298,8 @@ class Compiler(object):
                 node_class = _If
             elif cmd == 'else':
                 node_class = _Else
-            # elif cmd == 'call':
-            #     node_class = _Call
+            elif cmd == 'call':
+                node_class = _Call
         if node_class is None:
             raise TemplateSyntaxError(fragment)
         return node_class(fragment.clean)
