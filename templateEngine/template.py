@@ -12,7 +12,8 @@ import ast
 def enum(**enums):
     return type('Enum', (), enums)
 
-TOKEN_TYPE = enum(VAR_FRAGMENT=0, OPEN_BLOCK_FRAGMENT=1, CLOSE_BLOCK_FRAGMENT=2, TEXT_FRAGMENT=3)
+TOKEN_TYPE = enum(VAR_FRAGMENT=0, OPEN_BLOCK_FRAGMENT=1,
+                  CLOSE_BLOCK_FRAGMENT=2, TEXT_FRAGMENT=3)
 
 WHITESPACE = re.compile('\s+')
 VAR_START = '{{'
@@ -54,13 +55,11 @@ class TemplateSyntaxError(TemplateError):
     def __str__(self):
         return "SyntaxError '%s'" % self.fragment
 
-
-
-def eval_expression(expr):
+def eval_expr(expr):
     try:
         return 'literal', ast.literal_eval(expr)
     except ValueError, SyntaxError:
-        return 'name', expr
+        return 'expr', expr
 
 
 def resolve(name, context):
@@ -107,12 +106,14 @@ class _Node(object):
     def process_fragment(self, fragment):
         pass
 
+    #clear up when entering a new scope
     def enter_scope(self):
         pass
 
     def render(self, context):
         pass
 
+    #for if-else syntax that need to assign multiple fragment to different node
     def exit_scope(self):
         pass
 
@@ -126,7 +127,7 @@ class _Node(object):
 
 
 
-class _ScopableNode(_Node):
+class _ScopeNode(_Node):
     creates_scope = True
 
 class _Root(_Node):
@@ -152,12 +153,12 @@ class _Text(_Node):
 #      each
 #   /   |   \
 #  {{   it   }}
-class _Each(_ScopableNode):
+class _Each(_ScopeNode):
     def process_fragment(self, fragment):
         try:
             # fragment is like "each list_var"
             _, it = WHITESPACE.split(fragment, 1)
-            self.it = eval_expression(it) #('name' | 'literal', list_var)
+            self.it = eval_expr(it) #('expr' | 'literal', list_var)
         except ValueError:
             raise TemplateSyntaxError(fragment)
 
@@ -173,17 +174,17 @@ class _Each(_ScopableNode):
 #       ifNode-------------
 #      / | \    \          \
 #    lhs op rhs  if_branch else_branch
-class _If(_ScopableNode):
+class _If(_ScopeNode):
     def process_fragment(self, fragment):
         # foo > bar or BooleanValue
         compareBool = fragment.split()[1:]
         if len(compareBool) not in (1, 3):
             raise TemplateSyntaxError(fragment)
         #get the type for left and right side
-        self.lhs = eval_expression(compareBool[0])
+        self.lhs = eval_expr(compareBool[0])
         if len(compareBool) == 3:
             self.op = compareBool[1]
-            self.rhs = eval_expression(compareBool[2])
+            self.rhs = eval_expr(compareBool[2])
 
     def render(self, context):
         lhs = self.resolve_side(self.lhs, context)
@@ -219,7 +220,7 @@ class _Else(_Node):
     def render(self, context):
         pass
 
-class _Call(_Node):
+class _Invoke(_Node):
     def process_fragment(self, fragment):
         try:
             bits = WHITESPACE.split(fragment)
@@ -233,19 +234,19 @@ class _Call(_Node):
         for param in params:
             if '=' in param:
                 name, value = param.split('=')
-                kwargs[name] = eval_expression(value)
+                kwargs[name] = eval_expr(value)
             else:
-                args.append(eval_expression(param))
+                args.append(eval_expr(param))
         return args, kwargs
 
     def render(self, context):
         resolved_args, resolved_kwargs = [], {}
         for kind, value in self.args:
-            if kind == 'name':
+            if kind == 'expr':
                 value = resolve(value, context)
             resolved_args.append(value)
         for key, (kind, value) in self.kwargs.iteritems():
-            if kind == 'name':
+            if kind == 'expr':
                 value = resolve(value, context)
             resolved_kwargs[key] = value
         resolved_callable = resolve(self.callable, context)
@@ -299,7 +300,7 @@ class Compiler(object):
             elif cmd == 'else':
                 node_class = _Else
             elif cmd == 'call':
-                node_class = _Call
+                node_class = _Invoke
         if node_class is None:
             raise TemplateSyntaxError(fragment)
         return node_class(fragment.clean)
