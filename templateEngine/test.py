@@ -98,7 +98,7 @@ class IfTests(TestCase):
 def pow(m=2, e=2):
     return m ** e
 
-class CallTests(TestCase):
+class TestInvoke(TestCase):
 
     def test_no_args(self):
         rendered = Template('{% call pow %}').render(pow=pow)
@@ -117,3 +117,8 @@ class CallTests(TestCase):
         self.assertEquals(rendered, '16')
         rendered = Template('{% call pow m=3 e=4 %}').render(pow=pow)
         self.assertEquals(rendered, '81')
+
+
+class TestInheritance(TestCase):
+    def simple_inheritance(self):
+        pass
