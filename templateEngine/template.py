@@ -6,11 +6,12 @@ import ast
 
 
 # def enum(*sequential, **named):
-#     enums = dict(zip(sequential, range(len(sequential))), **named)
-#     return type('Enum', (), enums)
+# enums = dict(zip(sequential, range(len(sequential))), **named)
+# return type('Enum', (), enums)
 
 def enum(**enums):
     return type('Enum', (), enums)
+
 
 TOKEN_TYPE = enum(VAR_FRAGMENT=0, OPEN_BLOCK_FRAGMENT=1,
                   CLOSE_BLOCK_FRAGMENT=2, TEXT_FRAGMENT=3)
@@ -36,37 +37,39 @@ operator_lookup_table = {
     '>=': operator.ge
 }
 
+
 class TemplateError(Exception):
     pass
 
-class TemplateContextError(TemplateError):
 
+class TemplateContextError(TemplateError):
     def __init__(self, context_var):
         self.context_var = context_var
 
     def __str__(self):
         return "cannot resolve '%s'" % self.context_var
 
-class TemplateSyntaxError(TemplateError):
 
+class TemplateSyntaxError(TemplateError):
     def __init__(self, fragment):
         self.fragment_var = fragment
 
     def __str__(self):
         return "SyntaxError '%s'" % self.fragment
 
+
 def eval_expr(expr):
     try:
         return 'literal', ast.literal_eval(expr)
-    except ValueError, SyntaxError:
+    except ValueError:
         return 'expr', expr
 
 
-def resolve(name, context):
+def eval_var(name, context):
     if name.startswith('..'):
         context = context.get('..', {})
         name = name[2:]
-    try:#resolve name.foo.bar
+    try:  # resolve name.foo.bar
         for tok in name.split('.'):
             context = context[tok]
         return context
@@ -74,9 +77,9 @@ def resolve(name, context):
         raise TemplateContextError(name)
 
 
-#text fragment just after regex split, {{ var}} {% each ...%},
+# text fragment just after regex split, {{ var}} {% each ...%},
 # need to take out wrapping symbol for ast node
-class _Fragment(object):
+class _Tag(object):
     def __init__(self, raw_text):
         self.raw = raw_text
         self.clean = self.clean_fragment()
@@ -91,81 +94,90 @@ class _Fragment(object):
         raw_start = self.raw[:2]
         if raw_start == VAR_START:
             return TOKEN_TYPE.VAR_FRAGMENT
-        elif raw_start == BLOCK_START:#normal open block {% whatever ...%} or close symbol {% end %}
+        elif raw_start == BLOCK_START:  # normal open block {% whatever ...%} or close symbol {% end %}
             return TOKEN_TYPE.CLOSE_BLOCK_FRAGMENT if self.clean[:3] == 'end' else TOKEN_TYPE.OPEN_BLOCK_FRAGMENT
         else:
             return TOKEN_TYPE.TEXT_FRAGMENT
+
 
 class _Node(object):
     creates_scope = False
 
     def __init__(self, fragment=None):
         self.children = []
-        self.process_fragment(fragment)
 
-    def process_fragment(self, fragment):
-        pass
-
-    #clear up when entering a new scope
+    # clear up when entering a new scope
     def enter_scope(self):
         pass
 
+    # after generated AST, This method will return the output for each node
     def render(self, context):
         pass
 
-    #for if-else syntax that need to assign multiple fragment to different node
+    # for if-else syntax that need to assign multiple fragment to different node
     def exit_scope(self):
         pass
 
     def render_children(self, context, children=None):
         if children is None:
             children = self.children
+
         def render_child(child):
             child_html = child.render(context)
             return '' if not child_html else str(child_html)
-        return ''.join(map(render_child, children))
 
+        return ''.join(map(render_child, children))
 
 
 class _ScopeNode(_Node):
     creates_scope = True
 
+
 class _Root(_Node):
     def render(self, context):
         return self.render_children(context)
 
+
 class _Variable(_Node):
-    def process_fragment(self, fragment):
+    def __init__(self, fragment):
+        _Node.__init__(self)
         self.name = fragment
 
     def render(self, context):
-        return resolve(self.name, context)
+        return eval_var(self.name, context)
+
 
 class _Text(_Node):
-    def process_fragment(self, fragment):
+    def __init__(self, fragment):
         self.text = fragment
+        _Node.__init__(self)
 
     def render(self, context):
         return self.text
 
-#      root()
-#        |
+
+# root()
+# |
 #      each
 #   /   |   \
 #  {{   it   }}
 class _Each(_ScopeNode):
-    def process_fragment(self, fragment):
+    def __init__(self, fragment):
         try:
             # fragment is like "each list_var"
             _, it = WHITESPACE.split(fragment, 1)
-            self.it = eval_expr(it) #('expr' | 'literal', list_var)
+            #('expr' | 'literal', list_var)
+            self.it = eval_expr(it)
+            _ScopeNode.__init__(self)
         except ValueError:
             raise TemplateSyntaxError(fragment)
 
     def render(self, context):
-        items = self.it[1] if self.it[0] == 'literal' else resolve(self.it[1], context)
+        items = self.it[1] if self.it[0] == 'literal' else eval_var(self.it[1], context)
+
         def render_item(item):
             return self.render_children({'..': context, 'it': item})
+
         return ''.join(map(render_item, items))
 
 
@@ -175,16 +187,19 @@ class _Each(_ScopeNode):
 #      / | \    \          \
 #    lhs op rhs  if_branch else_branch
 class _If(_ScopeNode):
-    def process_fragment(self, fragment):
+    def __init__(self, fragment):
+        _ScopeNode.__init__(self)
+        self.if_branch = None
+        self.else_branch = None
         # foo > bar or BooleanValue
-        compareBool = fragment.split()[1:]
-        if len(compareBool) not in (1, 3):
+        compare_bool = fragment.split()[1:]
+        if len(compare_bool) not in (1, 3):
             raise TemplateSyntaxError(fragment)
         #get the type for left and right side
-        self.lhs = eval_expr(compareBool[0])
-        if len(compareBool) == 3:
-            self.op = compareBool[1]
-            self.rhs = eval_expr(compareBool[2])
+        self.lhs = eval_expr(compare_bool[0])
+        if len(compare_bool) == 3:
+            self.op = compare_bool[1]
+            self.rhs = eval_expr(compare_bool[2])
 
     def render(self, context):
         lhs = self.resolve_side(self.lhs, context)
@@ -196,12 +211,12 @@ class _If(_ScopeNode):
             exec_if_branch = op(lhs, rhs)
         else:
             exec_if_branch = operator.truth(lhs)
-        if_branch, else_branch = self.split_children()
+        self.if_branch, self.else_branch = self.split_children()
         return self.render_children(context,
-            self.if_branch if exec_if_branch else self.else_branch)
+                                    self.if_branch if exec_if_branch else self.else_branch)
 
     def resolve_side(self, side, context):
-        return side[1] if side[0] == 'literal' else resolve(side[1], context)
+        return side[1] if side[0] == 'literal' else eval_var(side[1], context)
 
     def exit_scope(self):
         self.if_branch, self.else_branch = self.split_children()
@@ -216,20 +231,24 @@ class _If(_ScopeNode):
             curr.append(child)
         return if_branch, else_branch
 
+
 class _Else(_Node):
     def render(self, context):
         pass
 
-class _Invoke(_Node):
-    def process_fragment(self, fragment):
+
+class _Apply(_Node):
+    def __init__(self, fragment):
         try:
             bits = WHITESPACE.split(fragment)
             self.callable = bits[1]
-            self.args, self.kwargs = self._parse_params(bits[2:])
-        except ValueError, IndexError:
+            self.args, self.kwargs = self.parse_params(bits[2:])
+        except ValueError:
             raise TemplateSyntaxError(fragment)
+        _Node.__init__(self)
 
-    def _parse_params(self, params):
+    @staticmethod
+    def parse_params(params):
         args, kwargs = [], {}
         for param in params:
             if '=' in param:
@@ -243,13 +262,13 @@ class _Invoke(_Node):
         resolved_args, resolved_kwargs = [], {}
         for kind, value in self.args:
             if kind == 'expr':
-                value = resolve(value, context)
+                value = eval_var(value, context)
             resolved_args.append(value)
         for key, (kind, value) in self.kwargs.iteritems():
             if kind == 'expr':
-                value = resolve(value, context)
+                value = eval_var(value, context)
             resolved_kwargs[key] = value
-        resolved_callable = resolve(self.callable, context)
+        resolved_callable = eval_var(self.callable, context)
         if hasattr(resolved_callable, '__call__'):
             return resolved_callable(*resolved_args, **resolved_kwargs)
         else:
@@ -263,8 +282,9 @@ class Compiler(object):
     def each_fragment(self):
         for fragment in TOK_REGEX.split(self.template_string):
             if fragment:
-                yield _Fragment(fragment)
+                yield _Tag(fragment)
 
+    #the output of compile is a AST
     def compile(self):
         root = _Root()
         scope_stack = [root]
@@ -285,7 +305,8 @@ class Compiler(object):
                     new_node.enter_scope()
         return root
 
-    def create_node(self, fragment):
+    @staticmethod
+    def create_node(fragment):
         node_class = None
         if fragment.type == TOKEN_TYPE.TEXT_FRAGMENT:
             node_class = _Text
@@ -300,7 +321,7 @@ class Compiler(object):
             elif cmd == 'else':
                 node_class = _Else
             elif cmd == 'call':
-                node_class = _Invoke
+                node_class = _Apply
         if node_class is None:
             raise TemplateSyntaxError(fragment)
         return node_class(fragment.clean)
