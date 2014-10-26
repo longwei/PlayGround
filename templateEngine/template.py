@@ -239,13 +239,14 @@ class _Else(_Node):
 
 class _Apply(_Node):
     def __init__(self, fragment):
+        _Node.__init__(self)
         try:
             bits = WHITESPACE.split(fragment)
             self.callable = bits[1]
             self.args, self.kwargs = self.parse_params(bits[2:])
         except ValueError:
             raise TemplateSyntaxError(fragment)
-        _Node.__init__(self)
+
 
     @staticmethod
     def parse_params(params):

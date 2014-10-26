@@ -1,6 +1,6 @@
 from unittest import TestCase
 from template import *
-
+import unittest
 
 __author__ = 'longwei'
 
@@ -118,7 +118,15 @@ class TestInvoke(TestCase):
         rendered = Template('{% call pow m=3 e=4 %}').render(pow=pow)
         self.assertEquals(rendered, '81')
 
+class TestBase(TestCase):
+    def test_no_args(self):
+        # print "haha"
+        extend = open("extend.html", "r")
+        x = extend.read()
+        print x
 
-class TestInheritance(TestCase):
-    def simple_inheritance(self):
-        pass
+        #it should be something like Template('zdkghkfd', {head:"head_content", body:"body_content"})
+        # self.assertEquals(rendered, '4')
+
+if __name__ == '__main__':
+    unittest.main()
