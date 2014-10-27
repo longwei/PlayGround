@@ -14,7 +14,7 @@ def enum(**enums):
 
 
 TOKEN_TYPE = enum(VAR_FRAGMENT=0, OPEN_BLOCK_FRAGMENT=1,
-                  CLOSE_BLOCK_FRAGMENT=2, TEXT_FRAGMENT=3)
+                  CLOSE_BLOCK_FRAGMENT=2, TEXT_FRAGMENT=3, BASE_TEMPLATE=4)
 
 WHITESPACE = re.compile('\s+')
 VAR_START = '{{'
@@ -79,7 +79,7 @@ def eval_var(name, context):
 
 # text fragment just after regex split, {{ var}} {% each ...%},
 # need to take out wrapping symbol for ast node
-class _Tag(object):
+class _Fragment(object):
     def __init__(self, raw_text):
         self.raw = raw_text
         self.clean = self.clean_fragment()
@@ -283,7 +283,7 @@ class Compiler(object):
     def each_fragment(self):
         for fragment in TOK_REGEX.split(self.template_string):
             if fragment:
-                yield _Tag(fragment)
+                yield _Fragment(fragment)
 
     #the output of compile is a AST
     def compile(self):
