@@ -91,6 +91,15 @@ ScopeStack:
 0  {% end %}
 ```
 
+
+extended.html
+======
+(extended node)
+     |
+   /   \
+(head) (body)
+
+
 REF
 ===
 https://docs.djangoproject.com/en/dev/topics/templates/
