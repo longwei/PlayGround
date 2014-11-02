@@ -7,13 +7,16 @@ done stuffs:
 
 * video player component for QML
 * thread based web server
+* template engine
 * yet another tiny compiler
+TOSee
 * scheme Interpreter
 * scheme to java compiler
 
+
 TODO list
 * tiny web framework http://webpy.org/ http://bottlepy.org/docs/dev/index.html
-* template engine
+
 * ORM (pony-ish)
 * a little virtual machine emulator
 
